@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>心灵冥想 | Mindful Moment</title>
+    <style>
+        :root {
+            --primary-color: rgba(255, 255, 255, 0.9);
+            --bg-overlay: rgba(0, 0, 0, 0.4);
+            --accent: #81C784;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            color: var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #333;
+            background-size: cover;
+            background-position: center;
+            transition: background-image 1s ease-in-out;
+        }
+
+        /* 背景遮罩，保证文字清晰 */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-overlay);
+            z-index: -1;
+        }
+
+        /* 顶部：时间与日期 */
+        .header {
+            margin-top: 40px;
+            text-align: center;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .time { font-size: 3rem; font-weight: 200; letter-spacing: 2px; }
+        .date { font-size: 1rem; opacity: 0.8; margin-top: 5px; }
+
+        /* 中部：名言卡片 */
+        .quote-container {
+            width: 85%;
+            max-width: 600px;
+            text-align: center;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+        .quote-text { font-size: 1.1rem; line-height: 1.6; font-style: italic; margin-bottom: 15px; }
+        .quote-author { font-size: 0.9rem; font-weight: bold; text-align: right; display: block; opacity: 0.9; }
+        .fav-btn {
+            margin-top: 10px;
+            background: none;
+            border: 1px solid rgba(255,255,255,0.5);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .fav-btn.active { background: var(--accent); border-color: var(--accent); }
+
+        /* 底部：控制区 */
+        .controls {
+            margin-bottom: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .main-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s;
+            backdrop-filter: blur(5px);
+        }
+        .main-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.4); }
+        
+        .action-bar {
+            display: flex;
+            gap: 20px;
+        }
+        .icon-btn {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.7);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        .icon-btn:hover { color: white; }
+
+        /* 弹窗样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #fff;
+            color: #333;
+            padding: 25px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 1.2rem; font-weight: bold; }
+        .close-btn { cursor: pointer; font-size: 1.5rem; }
+        
+        .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .stat-val { font-weight: bold; color: #4CAF50; }
+        
+        .history-list { font-size: 0.9rem; color: #666; max-height: 200px; overflow-y: scroll; }
+
+        /* 简单的Toast提示 */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 200;
+        }
+        .toast.show { opacity: 1; }
+
+    </style>
+</head>
+<body>
+
+    <div class="overlay"></div>
+    
+    <!-- 背景音乐 -->
+    <audio id="bg-music" loop>
+        <!-- 这是一个示例雨声链接，实际开发建议替换为本地文件或稳定的CDN -->
+        <source src="https://cdn.pixabay.com/download/audio/2022/05/17/audio_1c8dc3f031.mp3?filename=gentle-rain-drops-112355.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- 顶部时间 -->
+    <div class="header">
+        <div class="time" id="clock">00:00:00</div>
+        <div class="date" id="date">2023年01月01日 星期一</div>
+    </div>
+
+    <!-- 名言展示 -->
+    <div class="quote-container">
+        <div class="quote-text" id="quote-text">"正在加载今日智慧..."</div>
+        <span class="quote-author" id="quote-author">-</span>
+        <button class="fav-btn" id="fav-btn" onclick="toggleFavorite()">♡ 收藏</button>
+    </div>
+
+    <!-- 底部控制 -->
+    <div class="controls">
+        <button class="main-btn" onclick="handleCheckIn()">
+            <div>
+                <div style="font-size:1.5rem">🧘</div>
+                <div style="font-size:0.7rem; margin-top:2px">打卡</div>
+            </div>
+        </button>
+
+        <div class="action-bar">
+            <button class="icon-btn" onclick="toggleMusic()" title="音乐">🎵</button>
+            <button class="icon-btn" onclick="showStats()" title="统计">📊</button>
+            <button class="icon-btn" onclick="showFavs()" title="收藏夹">❤️</button>
+        </div>
+    </div>
+
+    <!-- 统计弹窗 -->
+    <div class="modal" id="stats-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">冥想统计</span>
+                <span class="close-btn" onclick="closeModal('stats-modal')">&times;</span>
+            </div>
+            <div class="stat-row">
+                <span>本周打卡</span>
+                <span class="stat-val" id="stat-week">0</span>
+            </div>
+            <div class="stat-row">
+                <span>本月打卡</span>
+                <span class="stat-val" id="stat-month">0</span>
+            </div>
+            <div class="stat-row">
+                <span>年度累计</span>
+                <span class="stat-val" id="stat-year">0</span>
+            </div>
+            <div style="margin-top:20px; font-weight:bold; margin-bottom:10px;">最近记录</div>
+            <div class="history-list" id="history-list">
+                <!-- 动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 收藏弹窗 -->
+    <div class="modal" id="fav-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">收藏的智慧</span>
+                <span class="close-btn" onclick="closeModal('fav-modal')">&times;</span>
+            </div>
+            <div class="history-list" id="fav-list">
+                <!-- 动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">打卡成功</div>
+
+    <script>
+        // --- 1. 心理学名言数据库 (示例 50条，后续可自行扩展至600条) ---
+        const quotesDB = [
+            { text: "向外看的人在做梦，向内看的人在觉醒。", author: "卡尔·荣格" },
+            { text: "你没有觉察到的事情，就会变成你的命运。", author: "卡尔·荣格" },
+            { text: "孤独并不是身边没有人，而是心中没有在乎的人。", author: "卡尔·荣格" },
+            { text: "未被表达的情绪永远不会消失。它们只是被活埋了，有朝一日会以更丑恶的方式爆发出来。", author: "西格蒙德·弗洛伊德" },
+            { text: "人生中最重要的问题，在绝大多数情况下，真的无法解决。我们只能在成长中超越它们。", author: "卡尔·荣格" },
+            { text: "爱是人与人之间唯一的理智和满意的回答。", author: "埃里希·弗洛姆" },
+            { text: "不成熟的爱是：因为我需要你，所以我爱你。成熟的爱是：因为我爱你，所以我需要你。", author: "埃里希·弗洛姆" },
+            { text: "真正的自由不是没有束缚，而是能够选择自己的束缚。", author: "萨特" },
+            { text: "痛苦不是病态，而是对痛苦的过度关注才是病态。", author: "森田正马" },
+            { text: "顺其自然，为所当为。", author: "森田正马" },
+            { text: "幸福不是由于没有痛苦，而是由于拥有克服痛苦的力量。", author: "阿尔弗雷德·阿德勒" },
+            { text: "所有的烦恼，都是人际关系的烦恼。", author: "阿尔弗雷德·阿德勒" },
+            { text: "人不是被事物本身困扰，而是被他们对事物的看法困扰。", author: "埃皮克提图" },
+            { text: "我们最深的恐惧不是我们不够好，而是我们强大得超乎想象。", author: "玛丽安·威廉森" },
+            { text: "只有当你接受了自己的本来面目，你才能改变。", author: "卡尔·罗杰斯" },
+            { text: "好的人生，是一种过程，而不是一种状态；它是一个方向，而不是一个终点。", author: "卡尔·罗杰斯" },
+            { text: "不仅要观察你的思想，还要观察思想之间的空间。", author: "埃克哈特·托利" },
+            { text: "当下是你所拥有的唯一时刻。", author: "埃克哈特·托利" },
+            { text: "即使是最小的行动，也比最伟大的意图要好。", author: "约翰·巴勒斯" },
+            { text: "除了你自己，没有人能带给你平静。", author: "拉尔夫·沃尔多·爱默生" },
+              { text: "你的潜意识指引着你的人生，而你称其为命运。", author: "荣格" },
+              { text: "梦是无意识心灵通往意识的皇家大道。", author: "弗洛伊德" },
+              { text: "幸运的人一生都被童年治愈，不幸的人一生都在治愈童年。", author: "阿德勒" },
+              { text: "孤独并不是来自身边无人。感到孤独的真正原因是因为一个人无法与他人交流对其最要紧的感受。", author: "荣格" },
+              { text: "未被表达的情绪永远不会消失。它们只是被活埋，并将在未来以更加丑陋的方式涌现。", author: "弗洛伊德" },
+              { text: "我们每个人都有不同程度的自卑感，因为我们都发现自己所处的地位是我们希望加以改进的。", author: "阿德勒" },
+              { text: "你连想改变别人的念头都不要有。要学习太阳一样，只是发出光和热。", author: "荣格" },
+              { text: "生命中唯一重要的事情是爱情和工作。", author: "弗洛伊德" },
+              { text: "生活的意义在于对他人发生兴趣以及互助合作。", author: "阿德勒" },
+              { text: "当爱支配一切时，权力就不存在了；当权力主宰一切时，爱就消失了。", author: "荣格" },
+              { text: "良心是一种内心的感觉，是对于躁动于我们体内的某种欲望的抵抗。", author: "弗洛伊德" },
+              { text: "应付生活中各种问题的勇气，能说明一个人如何定义生活的意义。", author: "阿德勒" },
+              { text: "向外看的人，做着梦；向内看的人，醒着。", author: "荣格" },
+              { text: "人类世界本质上是一个悲剧性的世界，不快乐是常态。", author: "弗洛伊德" },
+              { text: "人的烦恼皆源于人际关系。", author: "阿德勒" },
+              { text: "与其做好人，我宁愿做一个完整的人。", author: "荣格" },
+              { text: "本我过去在哪里，自我就应在哪里。", author: "弗洛伊德" },
+              { text: "我们生活在赋予我们的意义之中。", author: "阿德勒" },
+              { text: "对于普通人来说，一生最重要的功课就是学会接受自己。", author: "荣格" },
+              { text: "言辞具有不可思议的力量。他们能带来最大的幸福，也能带来最深的失望。", author: "弗洛伊德" },
+              { text: "自卑感本身并不是变态的，它是人类地位之所以增进的原因。", author: "阿德勒" },
+              { text: "在我们每个人的内心深处，都有一个永恒的少年。", author: "荣格" },
+              { text: "每个人都有一个本能的侵犯能量储存器，在储存器里，侵犯能量的总量是固定的。", author: "弗洛伊德" },
+              { text: "对别人不感兴趣的人，他一生中遇到的困难最多，对别人的伤害也最大。", author: "阿德勒" },
+              { text: "理解自身的阴暗，是对付他人阴暗一面的最好方法。", author: "荣格" },
+              { text: "人不是根本不相信自己的死，就是在无意识中确信自己不死。", author: "弗洛伊德" },
+              { text: "所有真正的'生活意义'的标志是：它们都是共同的意义，是他人能够分享的意义。", author: "阿德勒" },
+              { text: "你没有觉察到的事情，就会变成你的命运。", author: "荣格" },
+              { text: "没有所谓玩笑，所有的玩笑都有认真的成分。", author: "弗洛伊德" },
+              { text: "我们生存于与他人的联系中，如果我们选择孤独，便等于选择了死亡。", author: "阿德勒" },
+              { text: "健康的人不会折磨他人，往往是那些曾受折磨的人转而折磨他人。", author: "荣格" },
+              { text: "感情的冲动更接近于基于性本能的欲望冲动。", author: "弗洛伊德" },
+              { text: "人的一生很短暂，生命很脆弱，我们还需要不断地克服困难。", author: "阿德勒" },
+              { text: "一个人感觉合脚的鞋却会夹痛另一个人的脚。", author: "荣格" },
+              { text: "人生就像弈棋，一步失误，全盘皆输。", author: "弗洛伊德" },
+              { text: "奉献乃是生活的真实意义。", author: "阿德勒" },
+              { text: "人类的所有成就都源于创造性幻想。", author: "荣格" },
+              { text: "精神健康的人，总是努力地工作及爱人。", author: "弗洛伊德" },
+              { text: "我们不应该感情用事，而应该用大脑来思考问题。", author: "阿德勒" },
+              { text: "最可怕的事情是完全接受自己。", author: "荣格" },
+              { text: "梦的内容是由于意愿的形成，其目的在于满足意愿。", author: "弗洛伊德" },
+              { text: "我们每个人都有不同的性格缺陷，关键在于如何面对和超越它们。", author: "阿德勒" },
+              { text: "在生命中，最微不足道但有意义的事物，也比最伟大但无意义的事物更有价值。", author: "荣格" },
+              { text: "人是一个受本能愿望支配的低能弱智的生物。", author: "弗洛伊德" },
+              { text: "我们能够做的唯一事情就是，在我们存在的有限范围内尽量发挥自己的潜能。", author: "阿德勒" },
+              { text: "谁向外看，他就在梦中；谁向内看，他就醒来。", author: "荣格" },
+              { text: "禁欲对身体是有害的，严重者男女皆可出现神经症病状。", author: "弗洛伊德" },
+              { text: "人的行为不是由经验决定的，而是由我们对经验的解释决定的。", author: "阿德勒" },
+              { text: "人的任务，就是意识到从潜意识中努力向上涌出的内容。", author: "荣格" },
+              { text: "女人应该使男人变得温和，而不使他变得软弱。", author: "弗洛伊德" },
+              { text: "我们必须有恒心，尤其要有自信力！我们必须相信我们的天赋是要用来作某种事情的。", author: "阿德勒" },
+              { text: "思想的动摇并非正确与错误之间左右不定，而是一种理智与非理智之间徘徊。", author: "荣格" },
+              { text: "人体就是命运。", author: "弗洛伊德" },
+              { text: "我们生活在与他人的联系之中，假如我们因自卑而将自己孤立，我们必将自取灭亡。", author: "阿德勒" },
+              { text: "适用于一切的生活处方并不存在。", author: "荣格" },
+              { text: "人都有吮吸的欲望。", author: "弗洛伊德" },
+              { text: "对他人感兴趣的训练必须在童年期开始建立。", author: "阿德勒" },
+              { text: "恐惧与可怖都隐藏在表面之下，就在那一层薄薄的文明的外表之下。", author: "荣格" },
+              { text: "一种科学要对人类的知识有所贡献，也不必勉强人家信服。", author: "弗洛伊德" },
+              { text: "人从出生开始就离不开群体，人必须与群体发生联系。", author: "阿德勒" },
+              { text: "只有在黑暗中，才能看到星星。", author: "荣格" },
+              { text: "人的灵魂的本质是合作。", author: "阿德勒" },
+              { text: "疯狂是健康的一种表现形式，是整体健康的一种表达。", author: "荣格" },
+              { text: "人生有两大悲剧：一个是没有得到你心爱的东西；另一个是得到了你心爱的东西。", author: "弗洛伊德" },
+              { text: "光明使我们看见许多东西，也使我们看不见许多东西。", author: "荣格" },
+              { text: "本我所在，自我相依。", author: "弗洛伊德" },
+              { text: "人的行为是出于对优越感的追求。", author: "阿德勒" },
+              { text: "我知道的东西，我愿意忘记。", author: "荣格" },
+              { text: "人不是天性自负的，只有在逆境中他才感到自己。", author: "弗洛伊德" },
+              { text: "我们每个人都有创造性的力量，可以改变自己的生活风格。", author: "阿德勒" },
+              { text: "在我们的内心深处，我们都是孤独的。", author: "荣格" },
+              { text: "幸福决不是文化的价值标准。", author: "弗洛伊德" },
+              { text: "生活的不确定性正是我们希望的来源。", author: "阿德勒" },
+              { text: "最可怕的事情是完全了解自己。", author: "荣格" },
+              { text: "我们能够奉献的没有别的，只有热血、辛劳、眼泪和汗水。", author: "阿德勒" },
+              { text: "谁谈论永恒，谁就是在谈论自己。", author: "荣格" },
+              { text: "我们必须以现实为基础，而不是以幻想为基础。", author: "阿德勒" },
+              { text: "在每个人的生命中，总有一个时刻决定了他未来的方向。", author: "荣格" },
+              { text: "我们不应该让恐惧阻止我们去追求希望。", author: "阿德勒" },
+              { text: "你的视觉会变得越来越清晰，当你能够直视自己的灵魂时。", author: "荣格" },
+              { text: "我们必须有勇气去面对生活中的困难。", author: "阿德勒" },
+              { text: "意识就像一座冰山，我们只能看到水面上的小部分。", author: "弗洛伊德" },
+              { text: "儿童期的经历为一个人的命运奠定了基础。", author: "阿德勒" },
+              { text: "集体无意识是人类共同的心理遗产。", author: "荣格" },
+              { text: "压抑是神经症的主要机制。", author: "弗洛伊德" },
+              { text: "社会兴趣是心理健康的核心标准。", author: "阿德勒" },
+              { text: "中年危机是自我实现的必经阶段。", author: "荣格" },
+              { text: "防御机制是无意识的心理策略。", author: "弗洛伊德" },
+              { text: "追求卓越是人类的基本动力。", author: "阿德勒" },
+              { text: "个性化是心理发展的终极目标。", author: "荣格" },
+              { text: "俄狄浦斯情结是心理发展的关键阶段。", author: "弗洛伊德" },
+              { text: "创造性自我是人性的核心。", author: "阿德勒" },
+              { text: "阴影是我们不愿承认的自我部分。", author: "荣格" },
+              { text: "快乐原则与现实原则的冲突是心理冲突的根源。", author: "弗洛伊德" },
+              { text: "生活风格是个体对生活的独特应对方式。", author: "阿德勒" },
+              { text: "自性化是成为真正的自己的过程。", author: "荣格" },
+              { text: "移情是治疗过程中的重要现象。", author: "弗洛伊德" },
+              { text: "出生顺序对人格形成有重要影响。", author: "阿德勒" },
+              { text: "共时性是有意义巧合的心理现象。", author: "荣格" },
+              { text: "心理能量可以相互转换。", author: "弗洛伊德" },
+              { text: "虚构目的是个体行为的导向。", author: "阿德勒" },
+              { text: "原型是集体无意识的基本结构。", author: "荣格" },
+              { text: "心理决定论认为所有心理现象都有原因。", author: "弗洛伊德" },
+              { text: "社会平等是心理健康的前提。", author: "阿德勒" },
+              { text: "心理类型理论解释了人格差异。", author: "荣格" },
+              { text: "自由联想是探索潜意识的重要方法。", author: "弗洛伊德" },
+              { text: "共同体感觉是心理健康的标志。", author: "阿德勒" },
+              { text: "个性化过程需要整合意识和无意识。", author: "荣格" },
+              { text: "梦的解析是理解潜意识的钥匙。", author: "弗洛伊德" },
+              { text: "克服自卑感是人格发展的动力。", author: "阿德勒" },
+              { text: "自性是人格的统一和完整。", author: "荣格" },
+              { text: "心理治疗是让无意识成为意识的过程。", author: "弗洛伊德" },
+              { text: "社会有用性是衡量行为价值的标准。", author: "阿德勒" },
+              { text: "心理能量遵循守恒原则。", author: "荣格" },
+              { text: "童年经验对成人人格有决定性影响。", author: "弗洛伊德" },
+              { text: "勇气是面对生活困难的能力。", author: "阿德勒" },
+              { text: "无意识不仅包含个人历史，也包含人类历史。", author: "荣格" },
+              { text: "心理冲突源于本能与文明的矛盾。", author: "弗洛伊德" },
+              { text: "合作能力是心理健康的重要指标。", author: "阿德勒" },
+              { text: "自我实现需要经历多个发展阶段。", author: "荣格" },
+              { text: "心理防御是避免焦虑的无意识手段。", author: "弗洛伊德" },
+              { text: "生活意义需要在社会背景中寻找。", author: "阿德勒" },
+              { text: "心理成长是一个不断分化和整合的过程。", author: "荣格" },
+              { text: "本能理论是理解人类行为的基础。", author: "弗洛伊德" },
+              { text: "每个人都有改变自己命运的能力。", author: "阿德勒" },
+              { text: "心理完整需要接纳自己的光明与黑暗面。", author: "荣格" }
+
+            // 实际开发中，你可以将此列表扩展到600+
+        ];
+
+        // --- 2. 时间逻辑 ---
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('zh-CN', {hour12: false});
+            const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+            document.getElementById('date').innerText = now.toLocaleDateString('zh-CN', options);
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- 3. 背景图片 (每日更新逻辑) ---
+        function setBackground() {
+            // 使用 Unsplash 的自然/建筑关键词，加时间戳防止缓存，模拟每日更新
+            const today = new Date().toDateString();
+            // 这里用 picsum 或者 unsplash 的随机图作为演示
+            // 实际想固定每日一张，可以使用 seeded random logic based on date
+            const keywords = ['nature', 'mountain', 'forest', 'temple', 'lake', 'architecture'];
+            const randomKey = keywords[Math.floor(Math.random() * keywords.length)];
+            const imgUrl = `https://source.unsplash.com/1600x900/?${randomKey},calm`; 
+            
+            // 由于 Unsplash source 最近不稳定，如果上面失效，可以使用下面这个Picsum兜底：
+            // document.body.style.backgroundImage = `url('https://picsum.photos/1920/1080?grayscale&blur=2')`;
+            
+            // 为了演示效果，我们直接用一个稳定的自然图片URL（或者你可以换成你自己的API）
+            document.body.style.backgroundImage = `url('https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=1920&auto=format&fit=crop')`;
+        }
+        setBackground();
+
+        // --- 4. 名言逻辑 (每日随机或随机) ---
+        let currentQuote = {};
+        function loadQuote() {
+            // 简单随机，实际可配合日期算法做成"每日一句"
+            const index = Math.floor(Math.random() * quotesDB.length);
+            currentQuote = quotesDB[index];
+            document.getElementById('quote-text').innerText = `"${currentQuote.text}"`;
+            document.getElementById('quote-author').innerText = `—— ${currentQuote.author}`;
+            
+            // 检查是否已收藏
+            updateFavBtnState();
+        }
+        loadQuote();
+
+        // --- 5. 打卡系统 ---
+        function handleCheckIn() {
+            const now = new Date();
+            const log = {
+                id: now.getTime(),
+                date: now.toISOString(),
+                timestamp: now.getTime()
+            };
+            
+            let logs = JSON.parse(localStorage.getItem('meditation_logs') || '[]');
+            logs.push(log);
+            localStorage.setItem('meditation_logs', JSON.stringify(logs));
+            
+            showToast("🧘 打卡成功，内心归于平静");
+            
+            // 触发震动反馈 (如果设备支持)
+            if(navigator.vibrate) navigator.vibrate(50);
+        }
+
+        // --- 6. 统计逻辑 ---
+        function showStats() {
+            const logs = JSON.parse(localStorage.getItem('meditation_logs') || '[]');
+            const now = new Date();
+            
+            // 过滤
+            const thisWeek = logs.filter(l => {
+                const d = new Date(l.timestamp);
+                const diff = now.getTime() - d.getTime();
+                return diff < 7 * 24 * 60 * 60 * 1000; 
+            }).length;
+            
+            const thisMonth = logs.filter(l => {
+                const d = new Date(l.timestamp);
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            }).length;
+            
+            const thisYear = logs.filter(l => {
+                const d = new Date(l.timestamp);
+                return d.getFullYear() === now.getFullYear();
+            }).length;
+
+            document.getElementById('stat-week').innerText = thisWeek;
+            document.getElementById('stat-month').innerText = thisMonth;
+            document.getElementById('stat-year').innerText = thisYear;
+
+            // 历史列表
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            logs.sort((a,b) => b.timestamp - a.timestamp).slice(0, 20).forEach(log => {
+                const div = document.createElement('div');
+                div.style.padding = "8px 0";
+                div.style.borderBottom = "1px solid #f0f0f0";
+                div.innerText = new Date(log.timestamp).toLocaleString('zh-CN');
+                list.appendChild(div);
+            });
+
+            document.getElementById('stats-modal').style.display = 'flex';
+        }
+
+        // --- 7. 收藏功能 ---
+        function toggleFavorite() {
+            let favs = JSON.parse(localStorage.getItem('meditation_favs') || '[]');
+            const exists = favs.find(f => f.text === currentQuote.text);
+            
+            if (exists) {
+                favs = favs.filter(f => f.text !== currentQuote.text);
+                showToast("已取消收藏");
+            } else {
+                favs.push(currentQuote);
+                showToast("❤️ 已收藏名言");
+            }
+            localStorage.setItem('meditation_favs', JSON.stringify(favs));
+            updateFavBtnState();
+        }
+
+        function updateFavBtnState() {
+            let favs = JSON.parse(localStorage.getItem('meditation_favs') || '[]');
+            const exists = favs.find(f => f.text === currentQuote.text);
+            const btn = document.getElementById('fav-btn');
+            if (exists) {
+                btn.innerHTML = "❤️ 已收藏";
+                btn.classList.add('active');
+            } else {
+                btn.innerHTML = "♡ 收藏";
+                btn.classList.remove('active');
+            }
+        }
+
+        function showFavs() {
+            let favs = JSON.parse(localStorage.getItem('meditation_favs') || '[]');
+            const list = document.getElementById('fav-list');
+            list.innerHTML = '';
+            
+            if(favs.length === 0) {
+                list.innerHTML = "<div style='text-align:center; padding:20px;'>暂无收藏</div>";
+            } else {
+                favs.forEach(f => {
+                    const div = document.createElement('div');
+                    div.style.padding = "10px";
+                    div.style.borderBottom = "1px solid #eee";
+                    div.style.marginBottom = "5px";
+                    div.innerHTML = `<div>"${f.text}"</div><div style="text-align:right; font-size:0.8em; color:#888; margin-top:5px;">— ${f.author}</div>`;
+                    list.appendChild(div);
+                });
+            }
+            document.getElementById('fav-modal').style.display = 'flex';
+        }
+
+        // --- 8. 音乐控制 ---
+        let isPlaying = false;
+        function toggleMusic() {
+            const audio = document.getElementById('bg-music');
+            if (isPlaying) {
+                audio.pause();
+                showToast("🔇 音乐已关闭");
+            } else {
+                audio.play().catch(e => showToast("⚠️ 需用户交互才能播放"));
+                showToast("🎵 播放自然之声");
+            }
+            isPlaying = !isPlaying;
+        }
+
+        // --- 辅助 UI ---
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+        
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
