@@ -42,28 +42,51 @@
         .date { font-size: 1rem; color: var(--secondary-white); margin-top: 8px; font-weight: 300; letter-spacing: 1px; }
 
         /* --- 中部名言 (可点击切换) --- */
-        .quote-wrapper {
-            flex: 1; display: flex; align-items: center; justify-content: center;
-            width: 85%; max-width: 500px;
-        }
-        .quote-card {
-            text-align: center; padding: 30px 20px;
-            background: var(--glass-bg);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+                .quote-card {
+            /* 1. 尺寸固定：长方形布局 */
+            width: 88%;           /* 宽度更宽，占据屏幕大部分 */
+            max-width: 600px;     /*在大屏上限制最大宽度 */
+            height: 160px;        /* 设定固定高度，不再随文字伸缩 */
+
+            /* 2. 内容布局：让文字始终居中 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* 垂直居中 */
+            align-items: center;     /* 水平居中 */
+
+            /* 3. 视觉样式 (保持不变) */
+            padding: 30px;
+            text-align: center;
+            //background: var(--glass-bg);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
             border-radius: 20px;
             border: 1px solid var(--glass-border);
             cursor: pointer;
             transition: transform 0.2s, background 0.3s;
             position: relative;
         }
-        .quote-card:active { transform: scale(0.98); background: rgba(0,0,0,0.4); }
-        
-        /* 淡入淡出动画类 */
-        .fade-content { transition: opacity 0.5s ease; opacity: 1; }
-        .fade-content.hidden { opacity: 0; }
 
-        .quote-text { font-size: 1.15rem; line-height: 1.7; font-style: italic; margin-bottom: 15px; font-weight: 300; }
-        .quote-author { font-size: 0.9rem; color: var(--accent-color); display: block; font-weight: 500; text-align: right; }
+        .quote-card:active { transform: scale(0.98); background: rgba(0,0,0,0.4); }
+
+        /* 优化文字显示，防止过长溢出 */
+        .quote-text {
+            font-size: 1.1rem;
+            line-height: 1.7;
+            font-style: italic;
+            margin-bottom: 15px;
+            font-weight: 300;
+
+            /* 如果文字实在太长，允许滚动，但隐藏滚动条保持美观 */
+            max-height: 160px;
+            overflow-y: auto;
+            width: 100%;
+        }
+
+        /* 隐藏滚动条但保留滚动功能 */
+        .quote-text::-webkit-scrollbar { display: none; }
+        //.quote-author { font-size: 0.9rem; color: var(--accent-color); display: block; font-weight: 500; text-align: right; }
+        .quote-author { font-size: 0.9rem; display: block; font-weight: 500; text-align: right; }
         .tap-hint { font-size: 0.7rem; color: rgba(255,255,255,0.4); margin-top: 15px; display: block; }
 
         /* --- 底部功能区 --- */
@@ -171,9 +194,7 @@
     <div class="overlay"></div>
     
     <!-- 背景音效：雨声 -->
-    <audio id="bg-music" loop>
-        <source src="https://cdn.pixabay.com/download/audio/2022/05/17/audio_1c8dc3f031.mp3?filename=gentle-rain-drops-112355.mp3" type="audio/mpeg">
-    </audio>
+    <audio id="bg-music" preload="auto" loop></audio>
 
     <div class="layer-content header">
         <div class="time" id="clock">12:00:00</div>
@@ -454,6 +475,8 @@
             displayNewQuote();
             // 恢复收藏状态检查
             checkFavState();
+            loadRandomMusic(); // <--- 新增这一行，随机预备一首音乐
+
         }
 
         function updateClock() {
@@ -726,33 +749,63 @@
             document.getElementById('fav-list-modal').classList.remove('open');
         }
 
-        // --- 8. 音乐与工具 ---
+ // --- 8. 音乐系统 (精选大自然白噪音) ---
+         const musicTracks = [
+            // 1. 颂钵与深沉氛围：非常适合入定，带有神圣感
+            { name: "西藏颂钵", url: "https://cdn.pixabay.com/download/audio/2022/03/09/audio_c8c90e3e95.mp3?filename=tibetan-meditation-alpha-wave-10296.mp3" },
+
+            // 2. 纯净的阿尔法波：无旋律的嗡鸣声，帮助大脑进入放松状态
+            { name: "深海氛围", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_997ba50c08.mp3?filename=relaxing-meditation-117677.mp3" },
+
+            // 3. 极简钢琴与铺底：非常缓慢，像漂浮在云端
+            { name: "云端漫步", url: "https://cdn.pixabay.com/download/audio/2022/01/21/audio_31743c58bd.mp3?filename=mindfulness-relaxation-amp-meditation-music-22174.mp3" },
+
+            // 4. 宇宙冥想：空灵、广阔的感觉
+            { name: "宇宙回响", url: "https://cdn.pixabay.com/download/audio/2023/09/06/audio_475d349503.mp3?filename=deep-meditation-164459.mp3" },
+
+            // 5. 疗愈频率：非常温柔的合成器声音，没有尖锐的高音
+            { name: "内在疗愈", url: "https://cdn.pixabay.com/download/audio/2022/05/05/audio_13ee90c273.mp3?filename=meditation-impulse-30032.mp3" }
+        ];
+        let currentTrackName = "西藏颂钵";
+
+        function loadRandomMusic() {
+            const audio = document.getElementById('bg-music');
+            // 随机选取一首
+            const track = musicTracks[Math.floor(Math.random() * musicTracks.length)];
+            audio.src = track.url;
+            audio.volume = 0.6; // 设置默认音量为 60%，更加柔和
+            currentTrackName = track.name;
+        }
+
         function toggleMusic() {
             const audio = document.getElementById('bg-music');
             const btn = document.getElementById('music-btn');
-            
+
+            // 如果还没加载音乐（第一次点击），先加载
+            if (!audio.src) {
+                loadRandomMusic();
+            }
+
             if (bgMusicPlaying) {
                 audio.pause();
                 btn.classList.remove('active');
-                showToast("🔇 背景音已关闭");
+                showToast("🔇 音乐已暂停");
             } else {
                 audio.play().then(() => {
                     btn.classList.add('active');
-                    showToast("🎵 自然之声播放中");
+                    showToast(`🎵 播放中：${currentTrackName}`);
                 }).catch(e => {
-                    showToast("⚠️ 暂时无法播放，请检查网络");
+                    console.error(e);
+                    showToast("⚠️ 播放失败，请点击页面重试");
                 });
             }
             bgMusicPlaying = !bgMusicPlaying;
         }
 
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 2000);
-        }
-
+        // 别忘了在 init() 函数里调用 loadRandomMusic();
+        // 或者我们可以保持“点击才加载”的逻辑以节省流量。
+        // 推荐：在页面加载时就预备好链接 ↓
+        loadRandomMusic();
         // 启动
         init();
 
